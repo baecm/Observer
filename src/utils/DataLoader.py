@@ -15,9 +15,9 @@ class DataLoader:
         self.data = self.load_data(rep_file, args)
         
         filename = os.path.basename(rep_file)
-        output_path = os.path.join(self.output_dir, filename)
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
+        args.output = os.path.join(self.output_dir, filename)
+        if not os.path.exists(args.output):
+            os.makedirs(args.output)
         
         self.data['filename'] = filename
         self.data['temp_dir'] = tempfile.mkdtemp()
