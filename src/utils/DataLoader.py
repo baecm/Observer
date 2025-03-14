@@ -132,13 +132,15 @@ class DataLoader:
         players_in_frame = filtered_df.groupby('frame')['player'].nunique().reset_index()
 
         resolution_frame = players_in_frame.loc[players_in_frame['player'] < 2, 'frame'].min()
-        resolution_frame = resolution_frame if pd.notna(resolution_frame) else self.data['game_length']
 
         return resolution_frame, dataframe.to_dict('records')
 
     def load_data(self, file_path, args):
         meta = self.load_meta(file_path)
         resolution_frame, state_raw = self.load_state(file_path)
+        
+        if np.isnan(resolution_frame):
+            resolution_frame = meta['game_length']
         
         return {
             'map_name': meta['map_name'],
