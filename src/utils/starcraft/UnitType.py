@@ -147,12 +147,12 @@ class UnitType(Enum):
 
 
     def belongs_to(self, *categories: Category) -> bool:
-        """ 특정 유닛이 주어진 하나 이상의 카테고리에 속하는지 확인 """
+        """Return True if this unit belongs to any of the provided categories."""
         return any(category in self.value for category in categories)
 
     @classmethod
     def is_in_category(cls, name: str, category: Category) -> bool:
-        """ 주어진 이름이 특정 카테고리에 속하는지 확인 """
+        """Return True if the unit with the given enum name belongs to the specified category."""
         try:
             return category in cls[name].value
         except KeyError:
