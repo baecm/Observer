@@ -1,0 +1,25 @@
+FROM python:3.12-slim-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    wget \
+    vim \
+    htop \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY infra/docker/requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+CMD ["/bin/bash"]

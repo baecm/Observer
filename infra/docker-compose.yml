@@ -1,0 +1,17 @@
+services:
+  preprocessor:
+    build:
+      context: ../
+      dockerfile: infra/docker/Dockerfile
+    image: observer:0.9
+    environment:
+      - PYTHONPATH=/workspace/src
+    volumes:
+      - ${DATA_DIR}:/workspace/data
+      - ${SRC_DIR}:/workspace/src
+      - ./entrypoint.sh:/workspace/entrypoint.sh
+    user: "${UID}:${GID}"
+    shm_size: '${SHARED_MEMORY}'
+    working_dir: /workspace
+    stdin_open: true
+    entrypoint: ["bash", "entrypoint.sh"]
