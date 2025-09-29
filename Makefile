@@ -1,6 +1,4 @@
 COMPOSE_FILE=infra/docker-compose.yml
-PID_DIR=pids
-LOG_DIR=logs
 
 build:
 	docker compose -f $(COMPOSE_FILE) build
@@ -19,3 +17,9 @@ input:
 
 label:
 	docker compose -f $(COMPOSE_FILE) run --rm preprocessor label $(ARGS)
+
+train:
+	docker compose -f $(COMPOSE_FILE) run --rm trainer train $(ARGS)
+
+inference:
+	docker compose -f $(COMPOSE_FILE) run --rm trainer inference $(ARGS)
