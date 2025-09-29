@@ -12,13 +12,13 @@ log() {
 }
 
 case "$COMMAND" in
-input)
-  log "Preprocessing input..."
-  exec python src/input.py "$@"
+train)
+  log "Training model..."
+  exec python src/train.py "$@"
   ;;
-label)
-  log "Preprocessing label..."
-  exec python src/label.py "$@"
+inference)
+  log "Running inference..."
+  exec python src/inference.py "$@"
   ;;
 debug)
   log "Debugging..."
@@ -26,7 +26,7 @@ debug)
   ;;
 *)
   echo "[Error] Unknown command: $COMMAND"
-  echo "Try one of: preprocess_input, preprocess_label, debug"
+  echo "Try one of: train, inference, debug"
   exit 1
   ;;
 esac
