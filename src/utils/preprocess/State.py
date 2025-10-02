@@ -79,10 +79,10 @@ class State:
             p.join()
 
     def process(self):
-        if not self.data["state_raw"]:
+        if self.data["state_raw"].empty:
             return
 
-        last_frame = min(self.data["state_raw"][-1]["frame"], self.data["game_length"])
+        last_frame = min(self.data["state_raw"].tail(1)["frame"].item(), self.data["game_length"])
         frames = list(range(0, last_frame + 1))
 
         with Manager() as manager:

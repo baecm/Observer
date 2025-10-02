@@ -113,18 +113,42 @@ class DataLoader:
         events = [
             {
                 "frame": frame, 
+                "ID": id, 
                 "x": x, 
                 "y": y, 
                 "player": player, 
                 "unit_type": unit_type, 
-                "event_type": event_type
+                "event_type": event_type,
+                "target_id": target_id,
+                "target_x": target_x,
+                "target_y": target_y,
             }
             for event in iterable
-            for frame, x, y, player, unit_type, event_type in [event.split(",")]
+            for frame, id, x, y, player, unit_type, event_type, target_id, target_x, target_y in [event.split(",")]
             for frame, x, y in [map(int, [frame, x, y])]
         ]
 
         return events
+
+    def compute_resolution_frame(self, df: pd.DataFrame, game_length: int) -> int:
+        if df.empty:
+            return game_length + 1
+
+        players = [p for p in df['player'].unique() if p != 'Neutral']
+        if len(players) < 2:
+            return game_length + 1
+
+        last_seen = {}
+        for p in players:
+            sub = df.loc[df['player'] == p, 'frame']
+            if not sub.empty:
+                last_seen[p] = int(sub.max())
+
+        if len(last_seen) < 2:
+            return game_length + 1
+
+        cut = min(last_seen.values()) + 1  # 사용 마지막 프레임 + 1
+        return min(cut, game_length + 1)
 
     def load_state(self, path):
         print("Load state...", end="")
@@ -143,40 +167,17 @@ class DataLoader:
                                         'player': str, 'race': str, 'player_color': str, 'name': str, 'ID': str
                                         }
                                 )
-
-        # iterable = tqdm.tqdm(
-        #     state[1:], 
-        #     desc="Load state...", 
-        #     miniters=max(1, len(state[1:]) // 20)
-        # )
-
-        # state_data = [line.split(",") for line in iterable]
-        # state_array = np.array(state_data)
-        # del state_data        
-        
-        # dataframe = pd.DataFrame(state_array, columns=[
-        #     'frame', 'player', 'race', 'player_color', 'name', 'ID', 'x', 'y',
-        #     'top', 'bottom', 'left', 'right', 'HP', 'max_HP', 'shield', 'max_shield',
-        #     'energy', 'max_energy'
-        # ])
-
-        # int_columns = ['frame', 'x', 'y', 'top', 'bottom', 'left', 'right', 'HP',  'max_HP', 'shield', 'max_shield', 'energy', 'max_energy']
-        # dataframe[int_columns] = dataframe[int_columns].astype(int)
-
-        filtered_df = dataframe.query("player != 'Neutral'")
-        players_in_frame = filtered_df.groupby('frame')['player'].nunique().reset_index()
-
-        resolution_frame = players_in_frame.loc[players_in_frame['player'] < 2, 'frame'].min()
-
         print("Done")
-        return resolution_frame, dataframe.to_dict('records')
+        return dataframe
 
     def load_data(self, file_path, args):
         meta = self.load_meta(file_path)
-        resolution_frame, state_raw = self.load_state(file_path)
+        state_dataframe = self.load_state(file_path)
         
-        if np.isnan(resolution_frame):
-            resolution_frame = meta["game_length"]
+        total_meta = int(meta["game_length"]) + 1
+        resolution_frame = self.compute_resolution_frame(
+            state_dataframe, game_length=int(meta["game_length"])
+        )
         
         return {
             "map_name": meta["map_name"],
@@ -186,7 +187,6 @@ class DataLoader:
             "players_data": meta["players_data"],
             "terrain": self.load_terrain(file_path, meta),
             "vision_raw": self.load_vision(file_path, meta),
-            # "event_raw": self.load_event(file_path),
-            "state_raw": state_raw,
-            "resolution_frame": resolution_frame
+            "state_raw": state_dataframe,
+            "resolution_frame": min(resolution_frame, total_meta),
         }
