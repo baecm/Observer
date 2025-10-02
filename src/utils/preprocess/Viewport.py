@@ -43,20 +43,20 @@ class Viewport:
         #     print("[Save Error]", e)
         #     traceback.print_exc()
         """
-        COCO 형식 JSON을 data/label/dst/{replay_id}.rep/{method}/{method}.json
-        위치에 하나만 생성합니다.
+        Create a single COCO-format JSON at:
+          data/label/dst/{replay_id}.rep/{method}.json
         """
-        # 1) base label 디렉토리 (원래 result_root 는 data/label/src 였으니, dst 로 바꿔줍니다)
+        # 1) Base label directory (use "dst" for consolidated outputs)
         label_base = os.path.join(os.getcwd(), "data", "label", "dst")
 
-        # 2) replay/method 폴더 생성
+        # 2) Create {replay_id}.rep directory
         out_dir = os.path.join(label_base, f"{self.replay_id}.rep")
         os.makedirs(out_dir, exist_ok=True)
 
-        # 3) 최종 JSON 파일명은 `{method}.json`
+        # 3) Final JSON filename is "{method}.json"
         output_path = os.path.join(out_dir, f"{self.method}.json")
 
-        # 4) 결과 내보내기
+        # 4) Export results
         try:
             self.export_to_coco(
                 output_path=output_path,
@@ -68,6 +68,10 @@ class Viewport:
             traceback.print_exc()
 
     def load(self):
+        """
+        Load all .vpd files for the given replay from data/label/src/*/{replay_id}.rep.vpd
+        into memory using a multiprocessing pool.
+        """
         vpds_paths = glob.glob(os.path.join(self.viewport_root, "*", f"{self.replay_id}.rep.vpd"))
         try:
             with Pool(cpu_count() // 2) as pool:
@@ -79,6 +83,11 @@ class Viewport:
             return False
 
     def interpolation(self, dataframes):
+        """
+        For each dataframe, reindex by 'frame', forward-fill missing frames up to the
+        maximum observed frame, and coerce to integers. Returns a list of interpolated
+        dataframes indexed by 'frame'.
+        """
         interpolated = []
         for df in dataframes:
             try:
@@ -97,6 +106,11 @@ class Viewport:
         return interpolated
 
     def merge_dataframes(self, dataframes):
+        """
+        Horizontally concatenate multiple viewport dataframes (one per annotator/source),
+        forward-fill, cast to int, rename columns to vpx_i/vpy_i, and convert from pixels
+        to tiles using TILE_SIZE. Returns the merged dataframe and the number of sources.
+        """
         try:
             num = len(dataframes)
             df = pd.concat(dataframes, axis=1).ffill().astype(int)
@@ -109,11 +123,17 @@ class Viewport:
             return pd.DataFrame(), 0
 
     def preprocess_argmax_kernel_sum(self, dataframe, num_vpds):
+        """
+        Legacy approach: compute kernel-sum heatmaps and select argmax locations.
+        """
         return preprocess_argmax_kernel_sum_parallel(
             dataframe, num_vpds, config.KERNEL_SHAPE, config.ORIGIN_SHAPE, 1
         )
 
     def preprocess_unique_local_maximums(self, dataframe, num_vpds):
+        """
+        Local-maximum approach: identify unique local peaks and select stable maxima.
+        """
         from local_peaks import get_local_maximums, get_unique_peaks2
         return preprocess_unique_local_maximums_parallel(
             dataframe, num_vpds, config.KERNEL_SHAPE, config.ORIGIN_SHAPE, 1,
@@ -121,11 +141,18 @@ class Viewport:
         )
 
     def preprocess_all_correct(self, dataframe, num_vpds):
+        """
+        Baseline approach: treat all candidate viewports as correct (no disambiguation).
+        """
         return preprocess_all_correct_parallel(
             dataframe, num_vpds, 1
         )
 
     def preprocess_consider_previous(self, dataframe: pd.DataFrame, num_vpds: int):
+        """
+        Greedy temporal smoothing: among per-frame candidates, choose the nearest to the
+        previous viewport to minimize frame-to-frame jitter.
+        """
         def distance_2d(p1, p2):
             return np.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
@@ -174,6 +201,9 @@ class Viewport:
         return result
 
     def run(self, method):
+        """
+        Execute the selected preprocessing method and store results in memory.
+        """
         print(f"[Viewport] Method selected: {method}")
         try:
             print("[Viewport] Interpolating dataframes...")
@@ -202,11 +232,17 @@ class Viewport:
 
     def export_to_coco(self, output_path, viewport_dims=None):
         """
-        Export viewport results to COCO-style JSON.
-        - self.results: list of (x, y) or (x, y, w, h).
-        - viewport_dims: (w, h) applied if results only provide x, y.
+        Export viewport results to a COCO-style JSON file.
+
+        Notes
+        -----
+        - `self.results` may contain:
+            * a list of (x, y) tuples (single viewport per frame),
+            * or a list of iterables, each with multiple (x, y) tuples (multiple viewports per frame),
+            * or entries providing (x, y, w, h).
+        - If only (x, y) are provided, `viewport_dims` (or config.KERNEL_SHAPE) is used for bbox size.
         """
-        # COCO skeleton
+        # Base COCO structure
         coco = {
             "info": {
                 "description": f"Viewport annotations for replay {self.replay_id}",
@@ -221,30 +257,28 @@ class Viewport:
                 {"id": 1, "name": "viewport", "supercategory": "viewport"}
             ]
         }
-        # Image dims
+        # Image dimensions
         H, W = config.ORIGIN_SHAPE
-        # Images entries
-            
+
+        # Image entries (only for frames that exist in data/input/dst/{replay_id}.rep/{fid}.npy)
         for fid in range(len(self.results)):
             input_dir = os.path.join(os.getcwd(), "data", "input", "dst", self.replay_id + ".rep")
-            
             if not os.path.isfile(os.path.join(input_dir, f"{fid}.npy")):
                 continue
-            
             coco["images"].append({
                 "id": int(fid),
                 "file_name": f"input/dst/{self.replay_id}.rep/{fid}.npy",
                 "width": int(W),
                 "height": int(H)
             })
+
         # Annotations
         ann_id = 1
         for fid, res in enumerate(self.results):
             input_dir = os.path.join(os.getcwd(), "data", "input", "dst", self.replay_id + ".rep")
-            
             if not os.path.isfile(os.path.join(input_dir, f"{fid}.npy")):
                 continue
-            
+
             if isinstance(res, (list, tuple)):
                 coords = [np.asarray(r).flatten() for r in res]
             else:
@@ -257,7 +291,7 @@ class Viewport:
                 elif arr.size >= 4:
                     x, y, w, h = map(int, arr[:4])
                 else:
-                    raise ValueError(f"Unexpected res shape {arr.shape}")
+                    raise ValueError(f"Unexpected result shape {arr.shape}")
 
                 coco["annotations"].append({
                     "id":          ann_id,
@@ -270,7 +304,7 @@ class Viewport:
                 })
                 ann_id += 1
 
-        # 3) JSON 저장
+        # Write JSON
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(coco, f, indent=2, ensure_ascii=False)

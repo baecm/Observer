@@ -147,7 +147,7 @@ class DataLoader:
         if len(last_seen) < 2:
             return game_length + 1
 
-        cut = min(last_seen.values()) + 1  # 사용 마지막 프레임 + 1
+        cut = min(last_seen.values()) + 1  # last used frame + 1
         return min(cut, game_length + 1)
 
     def load_state(self, path):
