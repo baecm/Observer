@@ -114,22 +114,29 @@ def preprocess_all_correct_parallel(dataframe: pd.DataFrame, num_vpds: int, inte
 
 def save_all_results(results, path, replay_id=None, coco_dims=None):
     """
-    각 프레임마다 별도의 COCO JSON 파일을 생성하도록 변경했습니다.
-    - results: list of viewport outputs per frame [(x,y) or (x,y,w,h)]
-    - path: 저장 디렉토리
-    - replay_id: 파일명에 사용할 리플레이 ID
-    - coco_dims: (w, h) 뷰포트 크기, 없으면 config.KERNEL_SHAPE 사용
+    Generates one COCO-style JSON file per frame.
+
+    Parameters
+    ----------
+    results : list
+        A list of per-frame viewport outputs. Each element is either (x, y) or (x, y, w, h).
+    path : str
+        The output directory where JSON files will be saved.
+    replay_id : str, optional
+        The replay identifier used for file names.
+    coco_dims : tuple(int, int), optional
+        The viewport dimensions (w, h). If not provided, `config.KERNEL_SHAPE` is used.
     """
     import json
     from .Viewport import Viewport
 
     os.makedirs(path, exist_ok=True)
     
-    # 프레임별 JSON 생성
+    # Create one JSON per frame
     for t, res in enumerate(results):
-        # prepare entries per frame
+        # Prepare entries for this frame
         entries = []
-        # multi-instance case (list of coords)
+        # Multi-instance case (list of coordinates)
         if isinstance(res, (list, tuple)) and len(res) > 0 and isinstance(res[0], (list, tuple, np.ndarray)):
             for item in res:
                 x, y = int(item[0]), int(item[1])
@@ -139,14 +146,15 @@ def save_all_results(results, path, replay_id=None, coco_dims=None):
                     w, h = coco_dims
                 entries.append((x, y, w, h))
         else:
-            # single-instance
+            # Single-instance case
             if len(res) >= 4:
                 x, y, w, h = int(res[0]), int(res[1]), int(res[2]), int(res[3])
             else:
                 x, y = int(res[0]), int(res[1])
                 w, h = coco_dims
             entries.append((x, y, w, h))
-        # COCO 구조
+
+        # COCO structure
         image_entry = {
             "id": 0,
             "file_name": f"input/dst/{replay_id}.rep/{t}.npy",
