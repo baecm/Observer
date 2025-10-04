@@ -1,0 +1,7 @@
+matplotlib
+pycocotools
+numpy
+pandas
+tqdm
+torchvision
+tensorboard
