@@ -1,5 +1,6 @@
 # make input structure
-make input ARGS="--replays sample --include-components worker ground air building vision neutral resource terrain"
+make input ARGS="--replays 275 1725 3613 4520 4664 --include-components worker ground air building vision neutral resource terrain"
+make input ARGS="--replays 36 212 438 522 1559 1628 1660 2351 6219 11251 --include-components worker ground air building vision neutral resource terrain"
 
 # make label structure
 make label ARGS="--replays sample --method all_correct"
